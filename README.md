@@ -43,6 +43,13 @@ insert into `/etc/rc.local`
 sudo python /share/radio.py
 ```
 
+## Analog Tips:
+
+1. Get a radio that has an oldschool on/off switch so you can also switch the DC of the raspberyy pi
+2. Get a Wifi antenna or a USB cable that is long enough to keept the wifi adapter away from transistors in the radio
+3. Use an IC2 radio as it is easier to use than a standard 16x2 display
+
+
 ## Photos of my radio
 
 ![Radio1](https://raw.githubusercontent.com/zappingseb/raspberry_pi_internet_radio/master/images/ima3.jpeg)
@@ -50,3 +57,4 @@ sudo python /share/radio.py
 ![Radio2](https://raw.githubusercontent.com/zappingseb/raspberry_pi_internet_radio/master/images/ima1.jpeg)
 
 ![Radio3](https://raw.githubusercontent.com/zappingseb/raspberry_pi_internet_radio/master/images/ima2.jpg)
+
