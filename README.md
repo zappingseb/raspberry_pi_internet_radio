@@ -29,3 +29,15 @@ http://python-omxplayer-wrapper.readthedocs.io
    * switch_2 DOWN
      * reduce the radio channel by 1
      * display the radio channel name
+
+## Linux Setup
+
+Install omxplayer
+
+store the `radio.py` script into `/share`
+
+insert into `/etc/rc.local`
+```
+sudo python /share/radio.py
+```
+
