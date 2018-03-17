@@ -41,3 +41,10 @@ insert into `/etc/rc.local`
 sudo python /share/radio.py
 ```
 
+## Photos of my radio
+
+![Radio](https://raw.githubusercontent.com/zappingseb/raspberry_pi_internet_radio/master/images/ima1.jpg)
+
+![Radio](https://raw.githubusercontent.com/zappingseb/raspberry_pi_internet_radio/master/images/ima2.jpg)
+
+![Radio](https://raw.githubusercontent.com/zappingseb/raspberry_pi_internet_radio/master/images/ima3.jpg)
