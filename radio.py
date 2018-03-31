@@ -8,7 +8,120 @@ import RPi.GPIO as GPIO
 import time
 from omxplayer.player import OMXPlayer
 import smbus
-import time
+import calendar
+import pylast
+import os
+import yaml
+import datetime
+import json
+from pylast import NetworkError, WSError
+
+
+def get_secret_dict(secrets_file="/share/pylast.yaml"):
+    if os.path.isfile(secrets_file):
+        with open(secrets_file, "r") as f:  # see example_test_pylast.yaml
+            doc = yaml.load(f)
+    else:
+        return dict()
+    return doc
+
+class LastFMRadioScrobble():
+    """ A class to derive basic connectivities with
+    the last.fm API
+
+    On init it connects to the last.fm API with a session key
+
+    Without a session key it will cause a WSError
+    """
+
+    def __init__(self, network=None):
+        doc = get_secret_dict()
+
+        if network is None:
+            self.network = pylast.LastFMNetwork(api_key=doc['api_key'], api_secret=doc['api_secret'],
+                               username='zappingseb', password_hash='876f04cfce4a06b38871b3f7ed2cc9e7')
+        else:
+            self.network = network
+
+    def derive_track_dict(self, station):
+
+        lastfm_user = self.network.get_user(station)
+        tracklist = lastfm_user.get_recent_tracks(time_from=(calendar.timegm(datetime.datetime.now().utctimetuple()) - 12000),
+                                               time_to=calendar.timegm(datetime.datetime.now().utctimetuple()) - 3600,
+                                               limit=3)
+        try:
+            if len(tracklist)>0:
+                for i, track in enumerate(tracklist):
+
+                    song_tuples = [(i," - ".join([track.track.artist.name,
+                                                  track.track.title]))
+                                   for i, track in enumerate(tracklist)]
+
+                    songlist_form_hidden_data = [{"title":track.track.title,
+                                   "artist":track.track.artist.name,
+                                   "timestamp":track.timestamp}
+                                                 for track in tracklist]
+            else:
+                song_tuples=[]
+                songlist_form_hidden_data=""
+
+        except NetworkError:
+            song_tuples = [(1,"testsong"),
+                               (2,"testsong2")]
+
+            songlist_form_hidden_data = ""
+
+        return songlist_form_hidden_data
+
+    def scrobble_from_json(self, in_dict=[], indeces=list(), has_timestamp=True):
+        """From a json of Songs and a list of indeces scrobble songs to the last.fm API
+
+        This uses pylast.scrobble_many to simply scrobbe a list of songs from a jsonstring
+        that contains these songs and a list of indeces which songs to take from that list
+
+        :param jsonstring: A json put into a string. the json was compiled by :func:`songlist_form_hidden_data
+
+        :param indeces: A list of integers telling which elements to take from the songlist and scrobble them
+
+        :return: The list of songs as "Artist - Title - Timestamp" to be displayed in the app
+        """
+        data_list = in_dict
+
+        try:
+            data_list[indeces[0]]["timestamp"]
+        except KeyError:
+            has_timestamp = False
+
+        if has_timestamp:
+            tracklist = [{"title": data_list[index]["title"],
+                          "artist": data_list[index]["artist"],
+                          "timestamp": data_list[index]["timestamp"]}
+                         for index in indeces]
+        else:
+            tracklist = [{"title": data_list[index]["title"],
+                          "artist": data_list[index]["artist"],
+                          "timestamp": datetime.now()}
+                         for index in indeces]
+        try:
+            self.network.scrobble_many(tracks=tracklist)
+
+            if has_timestamp:
+                scrobbling_list = [" - ".join([
+                    data_list[index]["artist"],
+                    data_list[index]["title"],
+                    datetime.datetime.fromtimestamp(int(
+                        data_list[index]["timestamp"])
+                    ).strftime('%Y-%m-%d %H:%M')
+                ]) for index in indeces]
+            else:
+                scrobbling_list = [" - ".join([
+                    data_list[index]["artist"],
+                    data_list[index]["title"]]) for index in indeces]
+        except (WSError, NetworkError, KeyError) as d:
+            print(d)
+            scrobbling_list = False
+
+        return scrobbling_list
 
 # Define some device parameters
 I2C_ADDR  = 0x27 # I2C device address
@@ -87,7 +200,7 @@ def lcd_string(message,line):
     lcd_byte(ord(message[i]),LCD_CHR)
 
 # Define radio stations
-
+#                       0        1               2                   3            4       5       6
 radio_stations = ["  egoFM", "  mdrInfo", "  Deutschlandfunk", "  JazzRadio", "  BBC6","  BR2","  FM4"]
 
 radio_urls = [
@@ -104,9 +217,14 @@ radio_urls = [
 # Define global variables
 
 lcd_init()
-i=0
+f = open('/share/lastplay.txt', 'r')
+i = int(f.read())
+f.close()
+
 
 already_playing = False
+stored_timestamp = '0'
+sleep_count = 0
 
 GPIO.setup(17, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(18, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -146,9 +264,44 @@ while True:
     # Start playing
     print("PLAYMODE")
     if not already_playing:
-        radio_player = OMXPlayer(radio_urls[i])
+        try:
+            radio_player = OMXPlayer(radio_urls[i])
+        except:
+            print("problem init")
         already_playing = True
+        f = open('/share/lastplay.txt', 'w')
+        f.write(str(i))
+        f.close()
         lcd_string(radio_stations[i], LCD_LINE_1)
+    else:
+        # Radio Station BBC
+        if i == 4:
+            # Increase sleep count
+            sleep_count = sleep_count + 1
+            # After 20 seconds try scrobbling
+            if sleep_count > 10:
+
+                # reset sleep count
+                sleep_count = 0
+
+                # Connect to last.fm
+                last_fm_scrobble = LastFMRadioScrobble()
+
+                # Derive bbc tracks
+                last_tracks = last_fm_scrobble.derive_track_dict("bbc6music")
+
+                # Check last played track timestamp
+                if last_tracks[0]["timestamp"] != stored_timestamp:
+
+                    # Reset last timestamp to now
+                    stored_timestamp = last_tracks[0]["timestamp"]
+
+                    print(stored_timestamp)
+
+                    # scrobble last track
+                    scrob_list = last_fm_scrobble.scrobble_from_json(in_dict=last_tracks, indeces=[0], has_timestamp=True)
+                    print(scrob_list)
+
     lcd_string(" ".join(["  PLAY", time.strftime("%H:%M")]), LCD_LINE_2)
 
    print("\n")
