@@ -15,7 +15,30 @@ import yaml
 import datetime
 import json
 from pylast import NetworkError, WSError
+from lxml import html
+import requests
 
+
+def get_secret_djam(before_track = ""):
+    now = datetime.datetime.now()
+
+    page = requests.get('http://onlineradiobox.com/fr/ledjamra/playlist/?lang=en')
+
+    # print(page.content)
+    webpage = html.fromstring(page.content)
+
+    string = webpage.xpath('//table[@class="tablelist-schedule"]//tbody//tr[1]//td[2]//text()')[0].split(' - ', 1)
+    artist = string[0]
+    track = string[1]
+
+    if(track != before_track):
+        tracklist = [{"title":track,
+                      "artist":artist,
+                     "timestamp":now}]
+    else:
+        tracklist = []
+
+    return tracklist
 
 def get_secret_dict(secrets_file="/share/pylast.yaml"):
     if os.path.isfile(secrets_file):
@@ -200,15 +223,14 @@ def lcd_string(message,line):
     lcd_byte(ord(message[i]),LCD_CHR)
 
 # Define radio stations
-#                       0        1               2                   3            4       5       6        7
-radio_stations = ["  egoFM", "  mdrInfo", "  Deutschlandfunk", "  JazzRadio", "  DJAM","  BBC6","  BR2","  FM4"]
+#                       0        1               2                   3            4       5       6
+radio_stations = ["  egoFM", "  mdrInfo", "  Deutschlandfunk", "  JazzRadio", "  BBC6","  BR2","  FM4"]
 
 radio_urls = [
 "http://mp3ad.egofm.c.nmdn.net/ps-egofm_128/livestream.mp3",
 "http://mdr-284340-0.cast.mdr.de/mdr/284340/0/mp3/high/stream.mp3",
 "http://st01.dlf.de/dlf/01/128/mp3/stream.mp3",
 "http://jazz-wr03.ice.infomaniak.ch/jazz-wr03-128.mp3",
-    "http://ledjamradio.ice.infomaniak.ch/ledjamradio.mp3?x=0.8474474848604379",
     "http://bbcmedia.ic.llnwd.net/stream/bbcmedia_6music_mf_p",
 "http://br-br2-sued.cast.addradio.de/br/br2/sued/mp3/128/stream.mp3",
     "http://mp3stream1.apasf.apa.at"
