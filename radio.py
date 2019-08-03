@@ -78,7 +78,7 @@ class LastFMRadioScrobble():
 
         if network is None:
             f = open('/share/api_key.txt', 'r')
-            api_key = int(f.read())
+            api_key = str(f.read())
             f.close()
             self.network = pylast.LastFMNetwork(api_key=doc['api_key'], api_secret=doc['api_secret'],
                                                 username='zappingseb', password_hash=api_key)
